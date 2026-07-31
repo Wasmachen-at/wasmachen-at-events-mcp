@@ -9,9 +9,31 @@ const app = express();
 // Don't advertise the server stack. Removes the default `X-Powered-By: Express`
 // fingerprint from every response.
 app.disable('x-powered-by');
-// Behind a reverse proxy in production; needed for per-IP rate limiting.
-app.set('trust proxy', 1);
-app.use(express.json({ limit: '100kb' }));
+// Only trust `X-Forwarded-For` when a proxy is actually configured — see
+// config.trustProxyHops. Trusting a nonexistent proxy makes the client IP (and
+// therefore the per-IP rate limit) attacker-controlled.
+app.set('trust proxy', config.trustProxyHops);
+
+// Baseline response headers. This server returns JSON only and is never framed,
+// so everything can be locked down.
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
+  next();
+});
+
+// Global backstop so unauthenticated traffic can't hammer any route; /mcp gets
+// its own, tighter budget below.
+app.use(
+  rateLimit({
+    windowMs: 60 * 1000,
+    limit: Math.max(config.ipRateLimitPerMin * 4, 120),
+    standardHeaders: true,
+    legacyHeaders: false,
+  }),
+);
 
 app.get('/healthz', (_req, res) => {
   res.json({ status: 'ok' });
@@ -24,10 +46,34 @@ const mcpRateLimit = rateLimit({
   legacyHeaders: false,
 });
 
-// Permissive CORS on /mcp only - required by browser-based MCP clients
-// (e.g. MCP Inspector). Access itself is gated by the API key below.
+/**
+ * CORS for /mcp only, required by browser-based MCP clients (e.g. MCP
+ * Inspector). Defaults to any origin: the endpoint carries no ambient
+ * credentials — no cookies, no sessions — so a cross-origin request can only
+ * ever act as an anonymous caller, and `Allow-Credentials` is never sent. Set
+ * ALLOWED_ORIGINS to restrict it to known web clients.
+ */
+function resolveAllowedOrigin(origin: string | undefined): string | null {
+  if (!config.allowedOrigins.length) return '*';
+  if (origin && config.allowedOrigins.includes(origin)) return origin;
+  return null;
+}
+
 app.use('/mcp', mcpRateLimit, (req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin;
+  const allowed = resolveAllowedOrigin(origin);
+  if (allowed === null) {
+    res.status(403).json({
+      jsonrpc: '2.0',
+      error: { code: -32000, message: 'Origin not allowed' },
+      id: null,
+    });
+    return;
+  }
+  res.setHeader('Access-Control-Allow-Origin', allowed);
+  if (allowed !== '*') {
+    res.setHeader('Vary', 'Origin');
+  }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   res.setHeader(
     'Access-Control-Allow-Headers',
@@ -40,6 +86,10 @@ app.use('/mcp', mcpRateLimit, (req, res, next) => {
   }
   next();
 });
+
+// JSON body parsing is scoped to /mcp — the only route that takes a body — and
+// capped so a large payload can't exhaust memory.
+app.use('/mcp', express.json({ limit: '100kb' }));
 
 /** Extracts the API key from an Authorization: Bearer header or x-api-key. */
 function extractApiKey(req: express.Request): string | undefined {
@@ -106,6 +156,45 @@ app.delete('/mcp', (_req, res) => {
     error: { code: -32000, message: 'Method not allowed' },
     id: null,
   });
+});
+
+// Catch-all error handler. Express' default renders the stack trace in the
+// response body outside production; this always returns an opaque JSON-RPC
+// error instead, and keeps details server-side.
+app.use(
+  (
+    error: Error,
+    _req: express.Request,
+    res: express.Response,
+    next: express.NextFunction,
+  ) => {
+    if (res.headersSent) {
+      next(error);
+      return;
+    }
+    // Malformed or oversized JSON bodies land here from express.json().
+    const raw = (error as { status?: number }).status ?? 500;
+    const status = raw >= 400 && raw < 600 ? raw : 500;
+    if (status >= 500) {
+      console.error('Unhandled error', error);
+    }
+    const [code, message] =
+      status === 400
+        ? [-32700, 'Parse error']
+        : status === 413
+          ? [-32600, 'Request body too large']
+          : [-32603, 'Internal server error'];
+    res.status(status).json({
+      jsonrpc: '2.0',
+      error: { code, message },
+      id: null,
+    });
+  },
+);
+
+// Never surface an upstream/tool failure as a crashed process.
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled promise rejection', reason);
 });
 
 app.listen(config.port, () => {

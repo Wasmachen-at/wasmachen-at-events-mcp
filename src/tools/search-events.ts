@@ -42,24 +42,29 @@ export function registerSearchEventsTool(
     inputSchema: {
       query: z
         .string()
+        .max(300)
         .describe(
           'Keywords to match (event type, artist, topic), in German or English. ' +
             'Keep it to keywords - put city/date/category into the dedicated filters.',
         ),
       city: z
         .string()
+        .max(100)
         .optional()
         .describe('Austrian city to filter to, e.g. "Wien", "Linz", "Graz"'),
       dateFrom: z
         .string()
+        .max(40)
         .optional()
         .describe('ISO datetime; only events starting at/after this time'),
       dateTo: z
         .string()
+        .max(40)
         .optional()
         .describe('ISO datetime; only events starting before this time'),
       categories: z
-        .array(z.string())
+        .array(z.string().max(100))
+        .max(20)
         .optional()
         .describe('Category keys to filter to, if the user names a category'),
       limit: z
@@ -104,7 +109,23 @@ export function registerSearchEventsTool(
       categories,
       upcomingOnly: true,
     });
-    const response = await facetedSearch(query, filters, limit ?? 8);
+    let response;
+    try {
+      response = await facetedSearch(query, filters, limit ?? 8);
+    } catch (error) {
+      // Never surface the upstream URL/status to the caller; log it instead.
+      console.error('search-events: backend search failed', error);
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: 'The wasmachen.at event search is temporarily unavailable. Please try again.',
+          },
+        ],
+        structuredContent: { events: [] },
+        isError: true,
+      };
+    }
     const events = (response.hits ?? [])
       .map(mapHitToEventSummary)
       .filter((event): event is EventSummary => event !== null);

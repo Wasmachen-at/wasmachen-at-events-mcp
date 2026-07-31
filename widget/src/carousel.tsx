@@ -1,18 +1,22 @@
 import { h } from 'preact';
 import type { EventSummary } from './types';
-import { openExternal } from './bridge';
+import { isSafeHref, openExternal } from './bridge';
 import { formatDate, initialFor } from './format';
 
 function EventCard({ event }: { event: EventSummary }) {
   const dateLabel = formatDate(event.startDateTime);
   const location = [event.venueName, event.city].filter(Boolean).join(', ');
+  // Image URLs come from arbitrary media hosts; fall back to the gradient
+  // placeholder for anything that isn't a plain http(s) URL.
+  const imageUrl =
+    event.imageUrl && isSafeHref(event.imageUrl) ? event.imageUrl : null;
 
   return (
     <article class="card">
       <div class="card-image">
-        {event.imageUrl ? (
+        {imageUrl ? (
           <img
-            src={event.imageUrl}
+            src={imageUrl}
             alt={event.name}
             loading="lazy"
             onError={(e) => {

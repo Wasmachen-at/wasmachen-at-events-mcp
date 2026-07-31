@@ -31,4 +31,23 @@ export const config = {
    * ENABLE_WIDGET=true to advertise the interactive widget to ChatGPT.
    */
   enableWidget: process.env.ENABLE_WIDGET === 'true',
+  /**
+   * Number of reverse proxies in front of this server, for Express' `trust
+   * proxy`. Defaults to 0 (direct exposure): trusting a proxy that isn't there
+   * lets anyone spoof `X-Forwarded-For` and sidestep the per-IP rate limit.
+   * Set TRUST_PROXY_HOPS=1 when deploying behind exactly one proxy/load
+   * balancer, and only then.
+   */
+  trustProxyHops: Number(process.env.TRUST_PROXY_HOPS) || 0,
+  /**
+   * Comma-separated list of browser origins allowed to call /mcp. Empty (the
+   * default) means any origin — safe here because the endpoint carries no
+   * ambient credentials (no cookies, no session), so a cross-origin call can
+   * only ever act as an anonymous caller. Set it to lock the endpoint down to
+   * known web clients.
+   */
+  allowedOrigins: (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean),
 };

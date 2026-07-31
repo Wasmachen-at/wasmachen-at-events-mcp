@@ -109,6 +109,8 @@ All configuration is via environment variables:
 | `IP_RATE_LIMIT_PER_MIN` | `60`                     | Per-IP request limit (HTTP mode) — the anonymous abuse guard. |
 | `PORT`                  | `3007`                   | HTTP mode only (see [Self-hosting](#self-hosting)).        |
 | `UPSTREAM_TIMEOUT_MS`   | `5000`                   | Timeout for calls to the wasmachen.at API.                 |
+| `TRUST_PROXY_HOPS`      | `0`                      | Reverse proxies in front of the server. Set `1` **only** if there really is one — see [Security](#security). |
+| `ALLOWED_ORIGINS`       | *(empty = any)*          | Comma-separated browser origins allowed to call `/mcp`.    |
 
 ## Local development
 
@@ -142,8 +144,29 @@ npm run build
 node dist/src/index.js        # serves /mcp and a health check at /healthz
 ```
 
-A `Dockerfile` is included (`node:24-alpine`, exposes port 3007). Put it behind
-a reverse proxy that terminates TLS and forwards to the container.
+A `Dockerfile` is included (`node:24-alpine`, runs as the unprivileged `node`
+user, exposes port 3007). Put it behind a reverse proxy that terminates TLS and
+forwards to the container — and when you do, set `TRUST_PROXY_HOPS=1` so per-IP
+rate limiting sees the real client address.
+
+## Security
+
+Full policy and threat model: [SECURITY.md](SECURITY.md). Report vulnerabilities
+privately (GitHub security advisory or simon@wasmachen.at) — not as a public
+issue.
+
+Two things worth knowing before you deploy or integrate:
+
+- **`TRUST_PROXY_HOPS` defaults to `0`.** Only raise it if a reverse proxy is
+  genuinely in front of the server. Trusting a proxy that isn't there lets any
+  caller spoof `X-Forwarded-For` and walk past the per-IP rate limit. Also note
+  the limiter is in-memory, so it is per process — with multiple replicas,
+  enforce the limit at the proxy too.
+- **Tool output is data, not instructions.** Event names and descriptions come
+  from a public event platform, so they are attacker-influenceable text that
+  ends up in your model's context. This server never executes anything on the
+  model's behalf, but downstream agents should not treat event text as a
+  command.
 
 ## How it works
 

@@ -38,6 +38,7 @@ export function registerNearbyEventsTool(
     inputSchema: {
       location: z
         .string()
+        .max(200)
         .optional()
         .describe(
           'Place to search around: city, address, or landmark. Geocoded to ' +
@@ -63,10 +64,12 @@ export function registerNearbyEventsTool(
         .describe('Search radius in kilometres, default 5'),
       query: z
         .string()
+        .max(300)
         .optional()
         .describe('Optional natural-language refinement, in German or English'),
       categories: z
-        .array(z.string())
+        .array(z.string().max(100))
+        .max(20)
         .optional()
         .describe('Category keys to filter to, if the user names a category'),
       limit: z
@@ -136,11 +139,20 @@ export function registerNearbyEventsTool(
     const filters = buildSearchFilters({ categories, upcomingOnly: true });
     filters.push(`_geoRadius(${centreLat}, ${centreLng}, ${Math.round(radius * 1000)})`);
 
-    const response = await facetedSearch(
-      query ?? '',
-      filters,
-      Math.min(Math.max(max * 3, max), MAX_FETCH),
-    );
+    let response;
+    try {
+      response = await facetedSearch(
+        query ?? '',
+        filters,
+        Math.min(Math.max(max * 3, max), MAX_FETCH),
+      );
+    } catch (error) {
+      // Never surface the upstream URL/status to the caller; log it instead.
+      console.error('nearby-events: backend search failed', error);
+      return errorResult(
+        'The wasmachen.at event search is temporarily unavailable. Please try again.',
+      );
+    }
 
     const events = (response.hits ?? [])
       .map(mapHitToEventSummary)

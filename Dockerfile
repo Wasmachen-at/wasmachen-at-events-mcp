@@ -20,10 +20,14 @@ ENV NODE_ENV=production
 ENV PORT=3007
 
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 
-# Compiled server + bundled widget.
+# Compiled server + bundled widget. Owned by root, readable by `node`: the
+# runtime never needs to write to its own code.
 COPY --from=builder /app/dist ./dist
+
+# Drop privileges — `node` is an unprivileged user baked into the base image.
+USER node
 
 EXPOSE 3007
 CMD ["node", "dist/src/index.js"]

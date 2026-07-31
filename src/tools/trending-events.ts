@@ -50,7 +50,8 @@ export function registerTrendingEventsTool(
       'events - only reference events returned by this tool.',
     inputSchema: {
       categories: z
-        .array(z.string())
+        .array(z.string().max(100))
+        .max(20)
         .optional()
         .describe(
           'Category keys to restrict trending to. Omit for all categories.',

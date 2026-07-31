@@ -5,6 +5,10 @@
  * sanitizes and executes. The backend additionally appends
  * `startDateTime >= now` when no start-date constraint is present, so
  * upcoming-only is guaranteed server-side.
+ *
+ * Tool arguments are chosen by an LLM that may be steered by untrusted content
+ * (a user prompt, or event text the model just read), so every value is treated
+ * as untrusted input and escaped here rather than relying on the backend.
  */
 
 export interface SearchFilterArgs {
@@ -20,8 +24,28 @@ export interface SearchFilterArgs {
   upcomingOnly?: boolean;
 }
 
+/** Longest value accepted into a filter expression. */
+const MAX_FILTER_VALUE_LENGTH = 200;
+/** Cap on how many category keys a single call may filter on. */
+const MAX_CATEGORIES = 20;
+/** Control characters have no meaning in a filter value; drop them. */
+const CONTROL_CHARS = /[\u0000-\u001F\u007F]/g;
+
+/**
+ * Escapes a value for interpolation into a double-quoted MeiliSearch filter
+ * string. The backslash MUST be escaped before the quote: escaping only `"`
+ * lets a value ending in a backslash turn the closing quote into an escaped
+ * quote, breaking out of the string literal and injecting filter syntax.
+ */
 export function escapeFilterValue(value: string): string {
-  return String(value).replace(/"/g, '\\"');
+  return (
+    String(value)
+      // Truncate first so a slice can never cut an escape pair in half.
+      .slice(0, MAX_FILTER_VALUE_LENGTH)
+      .replace(CONTROL_CHARS, '')
+      .replace(/\\/g, '\\\\')
+      .replace(/"/g, '\\"')
+  );
 }
 
 /** Parses an ISO datetime into Unix seconds, or null when unparseable. */
@@ -49,9 +73,13 @@ export function buildSearchFilters(args: SearchFilterArgs): string[] {
   }
   if (Array.isArray(args.categories) && args.categories.length) {
     const quoted = args.categories
+      .filter((category) => typeof category === 'string' && category.trim())
+      .slice(0, MAX_CATEGORIES)
       .map((category) => `"${escapeFilterValue(category)}"`)
       .join(', ');
-    filters.push(`categories IN [${quoted}]`);
+    if (quoted) {
+      filters.push(`categories IN [${quoted}]`);
+    }
   }
   return filters;
 }

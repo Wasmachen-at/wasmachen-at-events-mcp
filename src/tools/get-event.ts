@@ -66,7 +66,14 @@ export function registerGetEventTool(
       'Fetch full details for a single wasmachen.at event by its slug. Use the ' +
       'slug values returned by search-events.',
     inputSchema: {
-      slug: z.string().describe('Event slug from a previous search-events result'),
+      slug: z
+        .string()
+        .min(1)
+        .max(200)
+        // Slugs are URL path segments; constraining the shape here keeps a
+        // model-supplied value from probing other backend paths.
+        .regex(/^[A-Za-z0-9._~-]+$/, 'Slug may only contain letters, digits, . _ ~ -')
+        .describe('Event slug from a previous search-events result'),
     },
     outputSchema: {
       events: z.array(eventSummarySchema),

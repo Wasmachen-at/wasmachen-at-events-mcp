@@ -13,6 +13,20 @@ describe('escapeFilterValue', () => {
   it('stringifies non-string input', () => {
     expect(escapeFilterValue(42 as unknown as string)).toBe('42');
   });
+
+  it('escapes backslashes before quotes so a value cannot break out', () => {
+    // A trailing backslash would otherwise escape the filter's closing quote.
+    expect(escapeFilterValue('Wien\\')).toBe('Wien\\\\');
+    expect(escapeFilterValue('a\\"b')).toBe('a\\\\\\"b');
+  });
+
+  it('strips control characters', () => {
+    expect(escapeFilterValue('Wien\n\u0000 Linz')).toBe('Wien Linz');
+  });
+
+  it('caps the value length', () => {
+    expect(escapeFilterValue('x'.repeat(500))).toHaveLength(200);
+  });
 });
 
 describe('toUnixSeconds', () => {
@@ -43,6 +57,30 @@ describe('buildSearchFilters', () => {
     expect(buildSearchFilters({ city: 'Sankt "X"' })).toEqual([
       'venue.address.city = "Sankt \\"X\\""',
     ]);
+  });
+
+  it('keeps an injected filter expression inside the quoted string', () => {
+    // Trailing backslash + injected clause: the classic breakout attempt.
+    const [filter] = buildSearchFilters({ city: 'Wien\\" OR startDateTime > 0' });
+    // Every quote in the payload stays escaped, so the only unescaped quotes
+    // are the two the template itself contributes.
+    expect(filter.replace(/\\\\/g, '').replace(/\\"/g, '')).toBe(
+      'venue.address.city = "Wien OR startDateTime > 0"',
+    );
+  });
+
+  it('caps how many categories a single call can filter on', () => {
+    const many = Array.from({ length: 50 }, (_, i) => `cat${i}`);
+    const [filter] = buildSearchFilters({ categories: many });
+    expect(filter.match(/"/g)).toHaveLength(40); // 20 keys x 2 quotes
+  });
+
+  it('drops non-string and blank category entries', () => {
+    expect(
+      buildSearchFilters({
+        categories: ['music.concert', '  ', 7 as unknown as string],
+      }),
+    ).toEqual(['categories IN ["music.concert"]']);
   });
 
   it('builds date range filters in unix seconds', () => {

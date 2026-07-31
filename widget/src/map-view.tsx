@@ -2,7 +2,7 @@ import { h } from 'preact';
 import { useEffect, useRef } from 'preact/hooks';
 import * as maplibregl from 'maplibre-gl';
 import type { EventSummary } from './types';
-import { openExternal } from './bridge';
+import { isSafeHref, openExternal } from './bridge';
 import { formatDate } from './format';
 
 const STYLE_URL = {
@@ -17,12 +17,17 @@ function popupHtml(event: EventSummary): string {
     value.replace(/[&<>"]/g, (c) =>
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string,
     );
+  // setHTML injects this verbatim, so every interpolated value is escaped and
+  // the link is dropped entirely unless it resolves to an http(s) URL.
+  const link = isSafeHref(event.url)
+    ? `<a href="${escape(event.url)}" data-href="${escape(event.url)}" class="popup-link">Auf wasmachen.at ansehen →</a>`
+    : '';
   return `
     <div class="popup">
       <strong>${escape(event.name)}</strong>
       ${dateLabel ? `<div class="popup-date">${escape(dateLabel)}</div>` : ''}
       ${location ? `<div class="popup-loc">${escape(location)}</div>` : ''}
-      <a href="${escape(event.url)}" data-href="${escape(event.url)}" class="popup-link">Auf wasmachen.at ansehen →</a>
+      ${link}
     </div>`;
 }
 

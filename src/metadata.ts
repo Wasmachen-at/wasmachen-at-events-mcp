@@ -8,6 +8,24 @@ import { getCategories, getCitiesWithEvents } from './api-client.js';
 
 const REFRESH_INTERVAL_MS = 60 * 60 * 1000;
 const MAX_CITIES = 15;
+const MAX_CATEGORY_KEYS = 60;
+const MAX_LABEL_LENGTH = 60;
+
+/**
+ * These values are interpolated into the tool description, which the model
+ * reads as instructions. Keeping them to short, single-line, punctuation-free
+ * labels means a compromised or mistakenly-populated backend row can't smuggle
+ * directives into the prompt.
+ */
+function sanitizeLabel(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const clean = value
+    .slice(0, MAX_LABEL_LENGTH)
+    .replace(/[^\p{L}\p{N} .,'’&/()\-_]/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return clean || null;
+}
 
 let topCities: string[] = [];
 let categoryKeys: string[] = [];
@@ -23,8 +41,13 @@ export async function refreshMetadata(): Promise<void> {
     // cities-with-events groups by city+postalCode, so the same city repeats.
     const countsByCity = new Map<string, number>();
     for (const entry of cities) {
-      if (!entry?.city) continue;
-      countsByCity.set(entry.city, (countsByCity.get(entry.city) ?? 0) + entry.count);
+      const city = sanitizeLabel(entry?.city);
+      if (!city) continue;
+      const count = Number(entry.count);
+      countsByCity.set(
+        city,
+        (countsByCity.get(city) ?? 0) + (Number.isFinite(count) ? count : 0),
+      );
     }
     topCities = [...countsByCity.entries()]
       .sort((a, b) => b[1] - a[1])
@@ -32,8 +55,10 @@ export async function refreshMetadata(): Promise<void> {
       .map(([city]) => city);
 
     categoryKeys = categories
-      .filter((category) => !category.hidden && category.i18nKey)
-      .map((category) => category.i18nKey);
+      .filter((category) => !category?.hidden)
+      .map((category) => sanitizeLabel(category?.i18nKey))
+      .filter((key): key is string => key !== null)
+      .slice(0, MAX_CATEGORY_KEYS);
 
     lastRefresh = Date.now();
   } catch (error) {

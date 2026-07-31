@@ -7,3 +7,14 @@ npm-debug.log*
 # environment variables
 .env
 .env.*
+
+# editor / IDE
+.idea/
+.vscode/
+*.iml
+
+# local agent + tooling state
+.claude/settings.local.json
+
+# OS cruft
+.DS_Store
