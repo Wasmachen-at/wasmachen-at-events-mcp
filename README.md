@@ -42,6 +42,17 @@ Add it under `env` when you have one (see [API keys](#api-keys)):
 }
 ```
 
+You can also run it directly from a terminal to smoke-test it before wiring it
+into a client — it speaks JSON-RPC over stdio, so it'll just sit there waiting
+for input, but a `wasmachen-events MCP server ready on stdio` line on stderr
+confirms it started (add `WASMACHEN_MCP_API_KEY` to test with a key):
+
+```bash
+npx -y wasmachen-events-mcp
+# or with an API key:
+WASMACHEN_MCP_API_KEY=wm_your_key_here npx -y wasmachen-events-mcp
+```
+
 Config file locations for common clients:
 
 | Client         | Config file                                                              |
