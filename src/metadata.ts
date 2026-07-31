@@ -63,10 +63,12 @@ export function buildSearchToolDescription(): string {
     ? ` Valid category keys: ${categoryKeys.join(', ')}.`
     : '';
   return (
-    'Search for real events in Austria on wasmachen.at using a natural-language query ' +
-    'plus optional structured filters. Combines semantic relevance with exact ' +
-    'city/date/category filters. Results are upcoming events only. Never invent ' +
-    'events - only reference events returned by this tool.' +
+    'Search for real events in Austria on wasmachen.at using keyword search plus ' +
+    'optional structured filters. Provide concise keywords (event type, artist, ' +
+    'topic) in `query`, and use the city/date/category filters for anything ' +
+    'structured rather than putting it in the query text. Results are upcoming ' +
+    'events only. Never invent events - only reference events returned by this ' +
+    'tool.' +
     cityHint +
     categoryHint
   );

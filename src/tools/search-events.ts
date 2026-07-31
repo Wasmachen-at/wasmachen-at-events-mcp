@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { registerAppTool } from '@modelcontextprotocol/ext-apps/server';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { assistantSearch } from '../api-client.js';
+import { facetedSearch } from '../api-client.js';
 import { buildSearchFilters } from '../filters.js';
 import { mapHitToEventSummary, summarizeEventsAsText } from '../mappers.js';
 import type { EventSummary } from '../mappers.js';
@@ -43,7 +43,8 @@ export function registerSearchEventsTool(
       query: z
         .string()
         .describe(
-          'Natural-language description of the desired events, in German or English',
+          'Keywords to match (event type, artist, topic), in German or English. ' +
+            'Keep it to keywords - put city/date/category into the dedicated filters.',
         ),
       city: z
         .string()
@@ -96,8 +97,14 @@ export function registerSearchEventsTool(
         : unauthorizedResult();
     }
     ensureMetadataFresh();
-    const filters = buildSearchFilters({ city, dateFrom, dateTo, categories });
-    const response = await assistantSearch(query, filters, limit ?? 8);
+    const filters = buildSearchFilters({
+      city,
+      dateFrom,
+      dateTo,
+      categories,
+      upcomingOnly: true,
+    });
+    const response = await facetedSearch(query, filters, limit ?? 8);
     const events = (response.hits ?? [])
       .map(mapHitToEventSummary)
       .filter((event): event is EventSummary => event !== null);

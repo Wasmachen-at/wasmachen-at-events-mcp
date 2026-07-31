@@ -1,7 +1,11 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerSearchEventsTool } from './tools/search-events.js';
 import { registerGetEventTool } from './tools/get-event.js';
+import { registerNearbyEventsTool } from './tools/nearby-events.js';
+// registerTrendingEventsTool (./tools/trending-events.js) is disabled for now —
+// the backend's popular/{category} endpoint has no popularity data yet.
 import { registerWidgetResource } from './widget-resource.js';
+import { registerPrompts } from './prompts.js';
 import { config } from './config.js';
 import type { AuthContext } from './auth.js';
 
@@ -19,6 +23,8 @@ export function buildMcpServer(context: AuthContext = {}): McpServer {
 
   registerSearchEventsTool(server, context);
   registerGetEventTool(server, context);
+  registerNearbyEventsTool(server, context);
+  registerPrompts(server);
   // ChatGPT-only UI widget; the tools work without it in every MCP client.
   if (config.enableWidget) {
     registerWidgetResource(server);

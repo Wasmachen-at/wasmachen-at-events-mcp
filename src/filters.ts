@@ -12,6 +12,12 @@ export interface SearchFilterArgs {
   dateFrom?: string;
   dateTo?: string;
   categories?: string[];
+  /**
+   * Append `startDateTime >= now` when no explicit start date is given.
+   * `/assistantSearch` did this server-side; `/facetedSearch` is generic, so
+   * the tools opt in to keep the "upcoming events only" guarantee.
+   */
+  upcomingOnly?: boolean;
 }
 
 export function escapeFilterValue(value: string): string {
@@ -34,6 +40,8 @@ export function buildSearchFilters(args: SearchFilterArgs): string[] {
   const from = toUnixSeconds(args.dateFrom);
   if (from !== null) {
     filters.push(`startDateTime >= ${from}`);
+  } else if (args.upcomingOnly) {
+    filters.push(`startDateTime >= ${Math.floor(Date.now() / 1000)}`);
   }
   const to = toUnixSeconds(args.dateTo);
   if (to !== null) {

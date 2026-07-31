@@ -30,5 +30,5 @@ export const config = {
    * core tools work in every MCP client (Claude, Cursor, …) without it. Set
    * ENABLE_WIDGET=true to advertise the interactive widget to ChatGPT.
    */
-  enableWidget: process.env.ENABLE_WIDGET === 'true',
+  enableWidget: process.env.ENABLE_WIDGET === 'false',
 };

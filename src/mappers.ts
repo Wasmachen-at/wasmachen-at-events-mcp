@@ -74,6 +74,65 @@ export function mapHitToEventSummary(hit: MeiliEventHit): EventSummary | null {
   };
 }
 
+/**
+ * Great-circle distance between two coordinates, in kilometres. Used to
+ * distance-sort nearby-events results (the search endpoint has no geo `sort`).
+ */
+export function haversineKm(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
+): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+/** Coerces a date that may be Unix seconds, ISO string, or Date to ISO. */
+function anyToIso(value: unknown): string | null {
+  if (typeof value === 'number') return secondsToIso(value);
+  if (typeof value === 'string' && value.trim()) {
+    const ms = Date.parse(value);
+    return Number.isNaN(ms) ? null : new Date(ms).toISOString();
+  }
+  return null;
+}
+
+/**
+ * Tolerant mapper for event documents whose shape isn't guaranteed — the
+ * `popular/{category}` endpoint returns plain event docs (id/geo/venue) rather
+ * than MeiliSearch hits (_id/_geo). Handles either.
+ */
+export function mapUnknownEventToSummary(raw: unknown): EventSummary | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const event = raw as Record<string, any>;
+  const id = event._id ?? event.id;
+  if (!id || !event.name || !event.slug) return null;
+  const lat = event._geo?.lat ?? event.geo?.latitude;
+  const lng = event._geo?.lng ?? event.geo?.longitude;
+  return {
+    id: String(id),
+    name: event.name,
+    slug: event.slug,
+    url: `${config.siteUrl}/event/${event.slug}`,
+    teaser: event.teaser ?? null,
+    imageUrl: pickImageUrl(event.mediaObjects),
+    city: event.venue?.address?.city ?? null,
+    venueName: event.venue?.name ?? null,
+    startDateTime: anyToIso(event.startDateTime),
+    endDateTime: anyToIso(event.endDateTime),
+    categories: Array.isArray(event.categories) ? event.categories : [],
+    latitude: typeof lat === 'number' ? lat : null,
+    longitude: typeof lng === 'number' ? lng : null,
+  };
+}
+
 /** Short text list the model (and text-only MCP clients) can read directly. */
 export function summarizeEventsAsText(events: EventSummary[]): string {
   if (!events.length) {

@@ -6,6 +6,9 @@ import { config } from './config.js';
 import { refreshMetadata } from './metadata.js';
 
 const app = express();
+// Don't advertise the server stack. Removes the default `X-Powered-By: Express`
+// fingerprint from every response.
+app.disable('x-powered-by');
 // Behind a reverse proxy in production; needed for per-IP rate limiting.
 app.set('trust proxy', 1);
 app.use(express.json({ limit: '100kb' }));

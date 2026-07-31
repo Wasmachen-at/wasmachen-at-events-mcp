@@ -5,6 +5,13 @@ import { config } from './config.js';
  * carries a hard timeout so a slow response can never hang an MCP tool call.
  */
 
+/**
+ * Identifies every request as originating from the MCP server (i.e. an AI
+ * agent). Sent on all backend calls via `apiFetch`; the backend can branch on
+ * its presence (AI-agent traffic) or parse the value for client + version.
+ */
+const CLIENT_ID = 'wasmachen-events-mcp/1.0.0';
+
 export interface MeiliEventHit {
   id: string;
   name: string;
@@ -29,7 +36,7 @@ export interface MeiliEventHit {
   mediaObjects?: Array<Record<string, unknown>>;
 }
 
-export interface AssistantSearchResponse {
+export interface EventSearchResponse {
   hits: MeiliEventHit[];
   estimatedTotalHits?: number;
 }
@@ -40,6 +47,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     signal: AbortSignal.timeout(config.upstreamTimeoutMs),
     headers: {
       'content-type': 'application/json',
+      'x-wasmachen-client': CLIENT_ID,
       ...init?.headers,
     },
   });
@@ -49,15 +57,64 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
-export function assistantSearch(
+/**
+ * Plain MeiliSearch faceted search — keyword `searchString` + Meili filter
+ * expressions, no AI/embedding step (unlike `/assistantSearch`, which spends AI
+ * credits interpreting free text). The MCP client is itself an LLM, so it
+ * supplies the keywords and structured filters and we search directly. Returns
+ * the full card projection (geo, media, teaser, categories).
+ */
+export function facetedSearch(
   searchString: string,
   filters: string[],
   limit: number,
-): Promise<AssistantSearchResponse> {
-  return apiFetch<AssistantSearchResponse>('/api/events/assistantSearch', {
+  sort: string[] = [],
+): Promise<EventSearchResponse> {
+  return apiFetch<EventSearchResponse>('/api/events/facetedSearch', {
     method: 'POST',
-    body: JSON.stringify({ searchString, filters, limit }),
+    body: JSON.stringify({
+      searchString,
+      facets: [],
+      filters,
+      sort,
+      offset: 0,
+      limit,
+    }),
   });
+}
+
+export interface NominatimPlace {
+  lat: string;
+  lon: string;
+  display_name?: string;
+  name?: string;
+  addresstype?: string;
+}
+
+/**
+ * Geocodes a free-text place name (city, address, landmark) to coordinates via
+ * the backend's Nominatim proxy. Used by `nearby-events` to turn a location
+ * name into the centre point of a geo-radius search.
+ */
+export function geoSearch(query: string, limit = 1): Promise<NominatimPlace[]> {
+  const params = new URLSearchParams({
+    q: query,
+    format: 'json',
+    addressdetails: '1',
+    limit: String(limit),
+  });
+  return apiFetch<NominatimPlace[]>(`/api/geo/search?${params.toString()}`);
+}
+
+/**
+ * Popularity-ranked events for a single category key. Shape is a plain event
+ * array (mapped defensively downstream). Returns `[]` when the backend has no
+ * popularity signal for the category.
+ */
+export function getPopularEvents(category: string): Promise<unknown[]> {
+  return apiFetch<unknown[]>(
+    `/api/events/popular/${encodeURIComponent(category)}`,
+  );
 }
 
 export function getEventBySlug(slug: string): Promise<Record<string, unknown>> {

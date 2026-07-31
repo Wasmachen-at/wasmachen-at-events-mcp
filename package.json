@@ -35,8 +35,8 @@
     "dev:stdio": "WASMACHEN_API_URL=${WASMACHEN_API_URL:-http://localhost:3001} tsx src/cli.ts",
     "build": "npm run build:widget && tsc -p tsconfig.json",
     "build:widget": "node scripts/build-widget.mjs",
-    "start": "node dist/src/index.js",
-    "start:stdio": "node dist/src/cli.js",
+    "start": "WASMACHEN_API_URL=${WASMACHEN_API_URL:-http://localhost:3001} node dist/src/index.js",
+    "start:stdio": "WASMACHEN_API_URL=${WASMACHEN_API_URL:-http://localhost:3001} node dist/src/cli.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "prepack": "npm run build"
