@@ -1,6 +1,6 @@
 {
   "name": "wasmachen-events-mcp",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "MCP server for searching wasmachen.at events from ChatGPT, Claude, and other MCP clients",
   "keywords": [
     "mcp",
@@ -12,8 +12,19 @@
     "austria"
   ],
   "homepage": "https://mcp.wasmachen.at",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Wasmachen-at/mcp-page.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Wasmachen-at/mcp-page/issues"
+  },
   "license": "MIT",
-  "author": "wasmachen.at",
+  "author": {
+    "name": "wasmachen.at",
+    "email": "support@wasmachen.at",
+    "url": "https://wasmachen.at"
+  },
   "type": "module",
   "main": "dist/src/index.js",
   "bin": {
