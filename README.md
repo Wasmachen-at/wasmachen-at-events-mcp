@@ -92,10 +92,13 @@ does not silently fall back to anonymous).
 
 ## Tools
 
-| Tool            | Description                                                            |
-| --------------- | --------------------------------------------------------------------- |
-| `search-events` | Search events by natural-language query plus optional filters: `city`, `dateFrom`, `dateTo`, `categories`, `limit`. Returns upcoming events with title, teaser, image, venue, date, and coordinates. |
-| `get-event`     | Full details for a single event by its slug.                          |
+| Tool                | Description                                                            |
+| ------------------- | --------------------------------------------------------------------- |
+| `search-events`     | Search events by natural-language query plus optional filters: `city`, `dateFrom`, `dateTo`, `categories`, `limit`. Returns upcoming events with title, teaser, image, venue, date, and coordinates. |
+| `get-event`         | Full details for a single event by its slug.                          |
+| `nearby-events`     | Find upcoming events near a location (name or lat/lng), sorted nearest first. |
+| `trending-events`   | Currently trending events (7-day trend signal), optionally restricted to category keys. |
+| `list-categories`   | Top-level category vocabulary with translations and sub-categories, for building filters. |
 
 Results come back as **structured data plus a text summary**, which every MCP
 client (Claude, Cursor, …) uses directly — no special integration needed.

@@ -138,3 +138,79 @@ export function getCategories(): Promise<
     '/api/category',
   );
 }
+
+export interface AgentCategory {
+  id: string;
+  name: string;
+  i18nKey: string;
+  translations: Record<string, string>;
+  subCategories?: AgentCategory[];
+}
+
+/**
+ * Agent-facing category vocabulary: top-level categories only, hidden
+ * categories excluded at every level, translations included. Richer than
+ * `getCategories` (hierarchy + translations) but only exposes what agents may
+ * use as search filters.
+ */
+export function getCategoriesForAgents(): Promise<AgentCategory[]> {
+  return apiFetch<AgentCategory[]>('/api/category/agent-list');
+}
+
+/**
+ * Gorse-backed 7-day trending events for a category (or `all`). Returns full
+ * event documents, like `getPopularEvents`.
+ */
+export function getTrendingEvents(
+  category: string,
+  limit?: number,
+): Promise<unknown[]> {
+  const query = limit ? `?limit=${encodeURIComponent(String(limit))}` : '';
+  return apiFetch<unknown[]>(
+    `/api/events/trending/${encodeURIComponent(category)}${query}`,
+  );
+}
+
+export interface TicketInfoTier {
+  label?: string | null;
+  price: number;
+  saleStartDate?: string | null;
+  saleEndDate?: string | null;
+}
+
+export interface TicketInfoTicket {
+  name: string;
+  description?: string;
+  type: 'paid' | 'free' | 'donation' | 'tiered';
+  price: number;
+  currency: string;
+  quantityAvailable?: number | null;
+  minPerOrder?: number;
+  maxPerOrder?: number;
+  saleStartDate?: string | null;
+  saleEndDate?: string | null;
+  tiers?: TicketInfoTier[];
+}
+
+export interface TicketInfoResponse {
+  /** Backend-defined; 'external_link' and 'none' are the only stable values we branch on. */
+  source: 'external_link' | 'none' | string;
+  eventSlug: string;
+  eventName: string;
+  startDateTime: string;
+  tickets: TicketInfoTicket[];
+  ticketUrl?: string;
+  actionType?: string;
+}
+
+/**
+ * Unified ticket/price/availability summary for an event: detailed product
+ * data when the event sells through the platform directly, otherwise whatever
+ * external ticket link the event carries (or `source: 'none'` when neither
+ * applies).
+ */
+export function getTicketInfo(slug: string): Promise<TicketInfoResponse> {
+  return apiFetch<TicketInfoResponse>(
+    `/api/public/events/${encodeURIComponent(slug)}/ticket-info`,
+  );
+}
