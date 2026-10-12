@@ -1,4 +1,5 @@
 import { config } from './config.js';
+import { AGENT_HEADER, currentAgent } from './agent-context.js';
 
 /**
  * Thin fetch wrappers around the wasmachen.at public event API. Every call
@@ -42,12 +43,14 @@ export interface EventSearchResponse {
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const agent = currentAgent();
   const response = await fetch(`${config.apiUrl}${path}`, {
     ...init,
     signal: AbortSignal.timeout(config.upstreamTimeoutMs),
     headers: {
       'content-type': 'application/json',
       'x-wasmachen-client': CLIENT_ID,
+      ...(agent ? { [AGENT_HEADER]: agent } : {}),
       ...init?.headers,
     },
   });

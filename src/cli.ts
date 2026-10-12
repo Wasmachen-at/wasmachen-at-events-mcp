@@ -3,6 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { buildMcpServer } from './server.js';
 import { refreshMetadata } from './metadata.js';
 import { config } from './config.js';
+import { setProcessAgent } from './agent-context.js';
 
 /**
  * stdio entry point for local MCP clients (Claude Desktop, Cursor, VS Code, …)
@@ -27,6 +28,13 @@ async function main(): Promise<void> {
   await refreshMetadata();
 
   const server = buildMcpServer({ apiKey: config.stdioApiKey });
+  // Tag backend calls with the local client (e.g. "claude-ai/0.1.0", "cursor-vscode/1.0.0").
+  server.server.oninitialized = () => {
+    const info = server.server.getClientVersion();
+    if (info?.name) {
+      setProcessAgent(info.version ? `${info.name}/${info.version}` : info.name);
+    }
+  };
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
