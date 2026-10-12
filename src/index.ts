@@ -4,6 +4,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { buildMcpServer } from './server.js';
 import { config } from './config.js';
 import { refreshMetadata } from './metadata.js';
+import { describeHttpAgent, runWithAgent } from './agent-context.js';
 
 const app = express();
 // Don't advertise the server stack. Removes the default `X-Powered-By: Express`
@@ -129,7 +130,10 @@ app.post('/mcp', async (req, res) => {
   });
   try {
     await server.connect(transport);
-    await transport.handleRequest(req, res, req.body);
+    // Tool handlers run inside handleRequest, so they see this request's agent.
+    await runWithAgent(describeHttpAgent(req.headers['user-agent'], req.body), () =>
+      transport.handleRequest(req, res, req.body),
+    );
   } catch (error) {
     console.error('Failed to handle MCP request', error);
     if (!res.headersSent) {
