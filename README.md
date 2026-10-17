@@ -210,6 +210,11 @@ rate limit. When a key is present, each tool call is authorized against the
 wasmachen.at API first (per-key rate limit) and reports usage — the key itself
 is the credential, so there is no shared secret to distribute.
 
+Keys an admin marks **unlimited** (wasmachen.at admin → Agents & MCP → API
+Tokens) have no per-key budget, and the HTTP server also lets them past its
+per-IP limit once the backend has confirmed them on a tool call. Their usage is
+still recorded like any other key.
+
 ## Publishing
 
 ```bash

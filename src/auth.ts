@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { config } from './config.js';
 
 /**
@@ -9,6 +10,9 @@ import { config } from './config.js';
  *    the backend/Redis, so it holds for every client including npx). A valid
  *    key also gets its usage tracked.
  * The API key itself is the credential — no shared secret to distribute.
+ *
+ * Keys an admin marked "unlimited" have no backend budget, and the HTTP server
+ * also lets them past its per-IP limit (see isKnownUnlimitedKey).
  */
 
 export interface AuthContext {
@@ -25,6 +29,47 @@ function authHeaders(rawKey: string): Record<string, string> {
     'content-type': 'application/json',
     authorization: `Bearer ${rawKey}`,
   };
+}
+
+/**
+ * Keys the backend has recently confirmed as unlimited, by SHA-256 of the key
+ * → expiry (ms). Only filled from successful `authorize` responses, so the
+ * per-IP limiter can consult it without a backend round trip and an
+ * unauthenticated caller can never make it call the backend. Bounded by the
+ * number of unlimited keys in use.
+ */
+const UNLIMITED_TTL_MS = 5 * 60 * 1000;
+const unlimitedKeys = new Map<string, number>();
+
+function keyDigest(rawKey: string): string {
+  return createHash('sha256').update(rawKey).digest('hex');
+}
+
+/**
+ * True when this key was confirmed unlimited by the backend within the last
+ * few minutes. The first calls of a fresh process still count against the
+ * per-IP limit until one tool call has been authorized; revoking the key or
+ * turning the limit back on takes effect at the next authorized call.
+ */
+export function isKnownUnlimitedKey(rawKey?: string): boolean {
+  if (!rawKey) return false;
+  const digest = keyDigest(rawKey);
+  const expires = unlimitedKeys.get(digest);
+  if (expires === undefined) return false;
+  if (expires < Date.now()) {
+    unlimitedKeys.delete(digest);
+    return false;
+  }
+  return true;
+}
+
+function rememberUnlimited(rawKey: string, unlimited: boolean): void {
+  const digest = keyDigest(rawKey);
+  if (unlimited) {
+    unlimitedKeys.set(digest, Date.now() + UNLIMITED_TTL_MS);
+  } else {
+    unlimitedKeys.delete(digest);
+  }
 }
 
 export async function authorize(rawKey?: string): Promise<AuthResult> {
@@ -44,7 +89,9 @@ export async function authorize(rawKey?: string): Promise<AuthResult> {
     if (response.ok) {
       const body = (await response.json().catch(() => ({}))) as {
         label?: string;
+        unlimited?: boolean;
       };
+      rememberUnlimited(rawKey, body.unlimited === true);
       return { ok: true, keyed: true, label: body.label };
     }
     if (response.status === 429) {
@@ -55,6 +102,7 @@ export async function authorize(rawKey?: string): Promise<AuthResult> {
     }
     // A key was provided but is invalid/revoked — reject rather than silently
     // falling back to anonymous, so a mistyped key is obvious.
+    rememberUnlimited(rawKey, false);
     return { ok: false, rateLimited: false };
   } catch {
     // Fail closed for keyed requests: if we can't reach the backend, deny.
