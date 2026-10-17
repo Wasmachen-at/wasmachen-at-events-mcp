@@ -53,7 +53,7 @@
     "prepack": "npm run build"
   },
   "dependencies": {
-    "@modelcontextprotocol/ext-apps": "^1.7.5",
+    "@modelcontextprotocol/ext-apps": "^2.0.3",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "express": "^5.2.1",
     "express-rate-limit": "^8.6.0",
