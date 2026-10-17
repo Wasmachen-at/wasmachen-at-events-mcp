@@ -64,11 +64,27 @@ Config file locations for common clients:
 Then ask your assistant something like *“Was kann ich am Wochenende in Linz
 machen?”* or *“Show me concerts in Vienna next month.”*
 
+### Claude
+
+- **claude.ai (web & apps):** *Settings → Connectors → Add custom connector*,
+  URL `https://mcp-api.wasmachen.at/mcp`, leave *Advanced settings* empty.
+  claude.ai custom connectors can't send an API key, so this runs anonymously
+  (shared limit). Use Claude Desktop or Claude Code for your own key.
+- **Claude Desktop:** *Settings → Developer → Edit Config*, paste the npx
+  config above (with `env` for your key), then quit and restart Claude Desktop.
+- **Claude Code:**
+
+  ```bash
+  claude mcp add --transport http wasmachen-events https://mcp-api.wasmachen.at/mcp \
+    --header "Authorization: Bearer wm_your_key_here"
+  claude mcp get wasmachen-events   # should say "Connected"
+  ```
+
 ### ChatGPT (hosted)
 
 In ChatGPT you don't use npx — add the hosted server as a connector:
 
-- **Endpoint:** `https://mcp.wasmachen.at/mcp`
+- **Endpoint:** `https://mcp-api.wasmachen.at/mcp`
 - **Authentication:** none required. Optionally set an API key / bearer token to
   raise your limit (ChatGPT sends it as `Authorization: Bearer <key>`).
 
@@ -82,7 +98,7 @@ A key is **optional**:
   and your usage is tracked.
 
 To get one, sign in at [wasmachen.at](https://wasmachen.at), open your profile,
-and go to the **Developer** tab. The key is shown once — copy it into your
+and go to the **AI assistants (MCP)** page. The key is shown once — copy it into your
 client config as `WASMACHEN_MCP_API_KEY` (npx) or the connector's bearer token
 (ChatGPT). You can rotate or delete it there anytime.
 
