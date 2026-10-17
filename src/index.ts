@@ -5,6 +5,7 @@ import { buildMcpServer } from './server.js';
 import { config } from './config.js';
 import { refreshMetadata } from './metadata.js';
 import { describeHttpAgent, runWithAgent } from './agent-context.js';
+import { isKnownUnlimitedKey } from './auth.js';
 
 const app = express();
 // Don't advertise the server stack. Removes the default `X-Powered-By: Express`
@@ -25,6 +26,26 @@ app.use((_req, res, next) => {
   next();
 });
 
+/** Extracts the API key from an Authorization: Bearer header or x-api-key. */
+function extractApiKey(req: express.Request): string | undefined {
+  const auth = req.headers.authorization;
+  if (auth?.startsWith('Bearer ')) {
+    return auth.slice('Bearer '.length).trim();
+  }
+  const headerKey = req.headers['x-api-key'];
+  if (typeof headerKey === 'string' && headerKey.trim()) {
+    return headerKey.trim();
+  }
+  return undefined;
+}
+
+/**
+ * Keys an admin created without a rate limit skip the per-IP limits too. Only
+ * keys the backend already confirmed are skipped (no lookup happens here), so
+ * sending an arbitrary key buys nothing.
+ */
+const skipForUnlimitedKey = (req: express.Request) => isKnownUnlimitedKey(extractApiKey(req));
+
 // Global backstop so unauthenticated traffic can't hammer any route; /mcp gets
 // its own, tighter budget below.
 app.use(
@@ -33,6 +54,7 @@ app.use(
     limit: Math.max(config.ipRateLimitPerMin * 4, 120),
     standardHeaders: true,
     legacyHeaders: false,
+    skip: skipForUnlimitedKey,
   }),
 );
 
@@ -45,6 +67,7 @@ const mcpRateLimit = rateLimit({
   limit: config.ipRateLimitPerMin,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: skipForUnlimitedKey,
 });
 
 /**
@@ -91,19 +114,6 @@ app.use('/mcp', mcpRateLimit, (req, res, next) => {
 // JSON body parsing is scoped to /mcp — the only route that takes a body — and
 // capped so a large payload can't exhaust memory.
 app.use('/mcp', express.json({ limit: '100kb' }));
-
-/** Extracts the API key from an Authorization: Bearer header or x-api-key. */
-function extractApiKey(req: express.Request): string | undefined {
-  const auth = req.headers.authorization;
-  if (auth?.startsWith('Bearer ')) {
-    return auth.slice('Bearer '.length).trim();
-  }
-  const headerKey = req.headers['x-api-key'];
-  if (typeof headerKey === 'string' && headerKey.trim()) {
-    return headerKey.trim();
-  }
-  return undefined;
-}
 
 app.post('/mcp', async (req, res) => {
   const apiKey = extractApiKey(req);

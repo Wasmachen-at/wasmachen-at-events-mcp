@@ -91,6 +91,62 @@ describe('authorize', () => {
   });
 });
 
+describe('isKnownUnlimitedKey', () => {
+  const okResponse = (body: Record<string, unknown>) => ({
+    ok: true,
+    status: 200,
+    json: async () => body,
+  });
+
+  it('is false until the backend has confirmed the key', async () => {
+    const { isKnownUnlimitedKey } = await loadAuth();
+    expect(isKnownUnlimitedKey(undefined)).toBe(false);
+    expect(isKnownUnlimitedKey('wm_unknown')).toBe(false);
+  });
+
+  it('remembers a key the backend reported as unlimited', async () => {
+    const { authorize, isKnownUnlimitedKey } = await loadAuth();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okResponse({ unlimited: true })));
+
+    await authorize('wm_unlimited');
+
+    expect(isKnownUnlimitedKey('wm_unlimited')).toBe(true);
+    expect(isKnownUnlimitedKey('wm_other')).toBe(false);
+  });
+
+  it('ignores limited keys', async () => {
+    const { authorize, isKnownUnlimitedKey } = await loadAuth();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okResponse({ unlimited: false })));
+
+    await authorize('wm_limited');
+
+    expect(isKnownUnlimitedKey('wm_limited')).toBe(false);
+  });
+
+  it('forgets a key once it is limited again or revoked', async () => {
+    const { authorize, isKnownUnlimitedKey } = await loadAuth();
+    const fetchSpy = vi.fn().mockResolvedValueOnce(okResponse({ unlimited: true }));
+    vi.stubGlobal('fetch', fetchSpy);
+    await authorize('wm_key');
+    expect(isKnownUnlimitedKey('wm_key')).toBe(true);
+
+    fetchSpy.mockResolvedValueOnce({ ok: false, status: 401, json: async () => ({}) });
+    await authorize('wm_key');
+    expect(isKnownUnlimitedKey('wm_key')).toBe(false);
+  });
+
+  it('expires the confirmation after a few minutes', async () => {
+    const { authorize, isKnownUnlimitedKey } = await loadAuth();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okResponse({ unlimited: true })));
+    const now = Date.now();
+    vi.spyOn(Date, 'now').mockReturnValue(now);
+    await authorize('wm_key');
+
+    vi.spyOn(Date, 'now').mockReturnValue(now + 5 * 60 * 1000 + 1);
+    expect(isKnownUnlimitedKey('wm_key')).toBe(false);
+  });
+});
+
 describe('recordUsage', () => {
   it('posts usage with a Bearer token when a key is present', async () => {
     const { recordUsage } = await loadAuth();
