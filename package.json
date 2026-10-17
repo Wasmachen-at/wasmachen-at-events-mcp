@@ -1,6 +1,6 @@
 {
   "name": "wasmachen-events-mcp",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "MCP server for searching wasmachen.at events from ChatGPT, Claude, and other MCP clients",
   "keywords": [
     "mcp",
