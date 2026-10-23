@@ -2,7 +2,7 @@
 # Self-contained: build context is this mcp-app/ directory.
 
 # ── Stage 1: build ────────────────────────────────────────────────────────────
-FROM node:24-alpine AS builder
+FROM node:24.22.1-alpine AS builder
 WORKDIR /app
 
 # Install deps first (better layer caching).
@@ -14,7 +14,7 @@ COPY . .
 RUN npm run build && npm test
 
 # ── Stage 2: runtime ──────────────────────────────────────────────────────────
-FROM node:24-alpine AS final
+FROM node:24.22.1-alpine AS final
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3007
