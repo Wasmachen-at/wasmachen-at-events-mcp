@@ -40,6 +40,13 @@ export const config = {
    */
   trustProxyHops: Number(process.env.TRUST_PROXY_HOPS) || 0,
   /**
+   * Shared secret for forwarding the HTTP caller's IP to the backend
+   * (`x-wasmachen-caller-ip`), so the admin's caller log and blocklist see the
+   * real user rather than this container. Must equal the backend's
+   * MCP_FORWARD_SECRET. Empty (the default, and always for npx) = not sent.
+   */
+  backendForwardSecret: process.env.BACKEND_FORWARD_SECRET || '',
+  /**
    * Comma-separated list of browser origins allowed to call /mcp. Empty (the
    * default) means any origin — safe here because the endpoint carries no
    * ambient credentials (no cookies, no session), so a cross-origin call can

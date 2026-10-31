@@ -141,8 +141,12 @@ app.post('/mcp', async (req, res) => {
   try {
     await server.connect(transport);
     // Tool handlers run inside handleRequest, so they see this request's agent.
-    await runWithAgent(describeHttpAgent(req.headers['user-agent'], req.body), () =>
-      transport.handleRequest(req, res, req.body),
+    // req.ip honours TRUST_PROXY_HOPS, so it is the real caller only when
+    // that matches the proxies in front of this server.
+    await runWithAgent(
+      describeHttpAgent(req.headers['user-agent'], req.body),
+      () => transport.handleRequest(req, res, req.body),
+      req.ip,
     );
   } catch (error) {
     console.error('Failed to handle MCP request', error);

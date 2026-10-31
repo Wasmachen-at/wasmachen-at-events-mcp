@@ -46,3 +46,17 @@ describe('currentAgent', () => {
     setProcessAgent(undefined);
   });
 });
+
+describe('caller IP', () => {
+  it('is scoped to the request and normalised', async () => {
+    const { currentCallerIp, normalizeCallerIp } = await import('../src/agent-context.js');
+    expect(normalizeCallerIp('::ffff:203.0.113.7')).toBe('203.0.113.7');
+    expect(normalizeCallerIp('1.2.3.4, 5.6.7.8')).toBeUndefined();
+    expect(normalizeCallerIp(undefined)).toBeUndefined();
+    runWithAgent('Claude-User', () => {
+      expect(currentCallerIp()).toBe('198.51.100.9');
+      expect(currentAgent()).toBe('Claude-User');
+    }, '198.51.100.9');
+    expect(currentCallerIp()).toBeUndefined();
+  });
+});
