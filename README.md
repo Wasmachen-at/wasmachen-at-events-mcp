@@ -140,6 +140,7 @@ All configuration is via environment variables:
 | `PORT`                  | `3007`                   | HTTP mode only (see [Self-hosting](#self-hosting)).        |
 | `UPSTREAM_TIMEOUT_MS`   | `5000`                   | Timeout for calls to the wasmachen.at API.                 |
 | `TRUST_PROXY_HOPS`      | `0`                      | Reverse proxies in front of the server. Set `1` **only** if there really is one — see [Security](#security). |
+| `BACKEND_FORWARD_SECRET` | _(empty)_            | Hosted server only. Shared secret (equal to the backend's `MCP_FORWARD_SECRET`) that lets this server pass the caller's IP to the backend as `x-wasmachen-caller-ip`, so the wasmachen.at admin can see and block who is behind a call. Never set it for npx installs. |
 | `ALLOWED_ORIGINS`       | *(empty = any)*          | Comma-separated browser origins allowed to call `/mcp`.    |
 
 ## Local development

@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { isIP } from 'node:net';
 
 /**
  * Who is actually on the other end of the MCP connection (ChatGPT, Claude,
@@ -14,7 +15,12 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 export const AGENT_HEADER = 'x-wasmachen-agent';
 
 const MAX_LENGTH = 200;
-const storage = new AsyncLocalStorage<string | undefined>();
+interface RequestContext {
+  agent?: string;
+  /** End user's IP as seen by this server (HTTP only). */
+  callerIp?: string;
+}
+const storage = new AsyncLocalStorage<RequestContext>();
 let processAgent: string | undefined;
 
 /** Printable ASCII only (header-safe), trimmed and capped. */
@@ -47,8 +53,28 @@ export function describeHttpAgent(
   return ua;
 }
 
-export function runWithAgent<T>(agent: string | undefined, fn: () => T): T {
-  return storage.run(agent, fn);
+export function runWithAgent<T>(
+  agent: string | undefined,
+  fn: () => T,
+  callerIp?: string,
+): T {
+  return storage.run({ agent, callerIp: normalizeCallerIp(callerIp) }, fn);
+}
+
+/** `::ffff:1.2.3.4` → `1.2.3.4`; anything that isn't a plain IP → undefined. */
+export function normalizeCallerIp(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const value = raw.trim().replace(/^::ffff:/i, '');
+  return isIP(value) ? value.toLowerCase() : undefined;
+}
+
+/**
+ * The HTTP caller's IP, forwarded to the backend (with a shared secret) so the
+ * admin can see and block who is behind a call. Undefined over stdio: there
+ * the backend sees the user's IP itself.
+ */
+export function currentCallerIp(): string | undefined {
+  return storage.getStore()?.callerIp;
 }
 
 /** stdio: remember the client from `initialize` for the whole process. */
@@ -57,5 +83,5 @@ export function setProcessAgent(agent: string | undefined): void {
 }
 
 export function currentAgent(): string | undefined {
-  return storage.getStore() ?? processAgent;
+  return storage.getStore()?.agent ?? processAgent;
 }
