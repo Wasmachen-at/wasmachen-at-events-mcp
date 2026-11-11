@@ -1,11 +1,19 @@
 version: 2
 updates:
+  # cooldown: version updates wait until a release is 7 days old, matching
+  # min-release-age in .npmrc (Dependabot's own default is 3 days). Most
+  # hijacked releases are found and pulled within hours. Security updates are
+  # not delayed by cooldown.
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
